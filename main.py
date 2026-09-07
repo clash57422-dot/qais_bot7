@@ -26,7 +26,7 @@ def run_health_check_server():
 # ---------------------------------------------------------
 # 2. Configurations & Constants
 # ---------------------------------------------------------
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8466390738:AAHMVZhjGaUuYZq0J-4RBFKZvJp9aVF-9R0")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "8556501768"))
 
 BINANCE_PAY_ID = "1006208970"

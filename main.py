@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-# --- 1. سيرفر وهمي لتشغيل Render مجاناً 24/7 بدون توقف ---
+# --- 1. سيرفر وهمي لتشغيل Render 24/7 ---
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -29,47 +29,55 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# --- 2. البيانات الأساسية والإعدادات الخاصة بقيس ---
+# --- 2. الإعدادات والبيانات الأساسية ---
 BOT_TOKEN = "8466390738:AAFLuzHub_ijth8G8DeKzV3moQ4afafIiZo"
-ADMIN_CHAT_ID = 8556501768  # ID قيس فقط (لا أحد غيرك يستطيع التحكم)
+ADMIN_CHAT_ID = 8556501768  # ID قيس فقط
 
-REQUIRED_CHANNEL = "qais_storeee"  # قناة الاشتراك الإجباري بدون @
-SUPPORT_USERNAME = "qais_storee"    # حساب الدعم الفني
+REQUIRED_CHANNEL = "qais_storeee"
+SUPPORT_USERNAME = "qais_storee"
 
 BINANCE_PAY_ID = "1006208970"
 USDT_WALLET = "0x409239a2a633f0627366f701c4ee3c2d5a9dac2a"
-
 BINANCE_API_KEY = "Al7fywuuad77sluatuiq60kwv6k9p2rf4nuh7vgxiuboilntmwnlzt2nbfmlgprh"
 BINANCE_SECRET_KEY = "wahitoge75wxgfss40o7p2hapkgwupelca65n3snr4qdou4rnep4xlaprlhzb8ab"
 
-# قاعدة بيانات المنتجات (سعر عادي وسعر البائعين)
+# قاعدة بيانات المنتجات الهيكلية (دعم الأيام والأسعار)
 products_db = {
-    "APKMOD": {"name": "تطبيقات APKMOD", "price": 5.0, "seller_price": 4.0},
-    "IOS": {"name": "تطبيقات IOS", "price": 10.0, "seller_price": 8.0},
-    "ROOT": {"name": "خدمات ROOT", "price": 15.0, "seller_price": 12.0}
+    "DRIP": {
+        "name": "Drip Client",
+        "options": {
+            "1d": {"label": "يوم واحد (1 Day)", "price": 2.0, "seller_price": 1.5},
+            "7d": {"label": "7 أيام (1 Week)", "price": 8.0, "seller_price": 6.0},
+            "30d": {"label": "30 يوم (1 Month)", "price": 20.0, "seller_price": 15.0}
+        }
+    },
+    "IOS": {
+        "name": "تطبيقات IOS",
+        "options": {
+            "30d": {"label": "اشتراك شهر", "price": 10.0, "seller_price": 8.0}
+        }
+    }
 }
 
-# قواعد البيانات في الذاكرة
-user_balances = {}       # الرصيد الرئيسي
-ref_balances = {}        # رصيد الإحالة
-user_referrals = {}      # من أحال من (New_ID: Ref_ID)
-sellers_list = set()     # قائمة الـ IDs المعتمدة كبائعين
-banned_users = set()     # قائمة الحظر
-gift_codes = {}          # أكواد الشحن {"CODE": Amount}
-user_orders = {}         # سجل الطلبات لكل مستخدم
+user_balances = {}
+ref_balances = {}
+user_referrals = {}
+sellers_list = set()
+banned_users = set()
+gift_codes = {}
+user_orders = {}
 user_data = {}
 all_users = set()
 used_txids = set()
 
-# النصوص العامة
 bot_texts = {
     "welcome_ar": "👋 **أهلاً بك في QAIS STORE!**\n⭐ متجر الخدمات والتطبيقات المعدلة الممتازة\n⚡ تحقق وإيداع آلي 24/7",
     "welcome_en": "👋 **Welcome to QAIS STORE!**\n⭐ Premium Game Keys & Mod Tools\n⚡ Instant Verification 24/7",
     "support": f"💬 للتواصل مع الدعم الفني المباشر: @{SUPPORT_USERNAME}",
-    "how_to": "📖 **طريقة الاستخدام:**\n1. اشحن محفظتك بـ USDT عبر بايننس.\n2. اختر الخدمة من المتجر.\n3. أدخل بريدك واستلم طلبك فوراً."
+    "how_to": "📖 **طريقة الاستخدام:**\n1. اشحن محفظتك بـ USDT عبر بايننس.\n2. اختر الخدمة والمدة المناسبة.\n3. أدخل بريدك واستلم طلبك فوراً."
 }
 
-# --- 3. أدوات التحقق واشتراك القناة وبابننس ---
+# --- 3. أدوات الفحص والدعم ---
 async def check_subscription(user_id, context):
     if not REQUIRED_CHANNEL:
         return True
@@ -108,53 +116,32 @@ def check_binance_deposit(tx_id):
 def is_valid_amount(amount):
     return amount == 1.0 or (amount >= 5.0 and amount % 5.0 == 0)
 
-# --- 4. بناء القوائم الرئيسية ---
 def build_main_menu(lang, balance, user_id):
     is_seller = "👑 (حساب بائع)" if user_id in sellers_list else ""
     welcome_txt = bot_texts["welcome_en"] if lang == "en" else bot_texts["welcome_ar"]
     
-    if lang == "en":
-        text = (
-            f"🤖 **─── QAIS Gaming Store ───** {is_seller}\n\n"
-            f"{welcome_txt}\n\n"
-            f"🆔 Your ID: `{user_id}`\n"
-            f"💰 Balance: **${balance:.2f}**\n"
-            f"🎁 Ref Balance: **${ref_balances.get(user_id, 0.0):.2f}**"
-        )
-        keyboard = [
-            [InlineKeyboardButton("💎 Shop Now", callback_data="store")],
-            [InlineKeyboardButton("📜 My Orders", callback_data="my_orders"), InlineKeyboardButton("👑 Profile", callback_data="profile")],
-            [InlineKeyboardButton("💳 Add Balance", callback_data="deposit"), InlineKeyboardButton("🤝 Referral System", callback_data="referral")],
-            [InlineKeyboardButton("🎁 Redeem Gift Code", callback_data="use_code")],
-            [InlineKeyboardButton("📖 How to Use", callback_data="how_to"), InlineKeyboardButton("💬 Support", callback_data="support")],
-            [InlineKeyboardButton("🇸🇦 العربية", callback_data="lang_ar"), InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")]
-        ]
-    else:
-        text = (
-            f"🤖 **─── متجر قيس للخدمات ───** {is_seller}\n\n"
-            f"{welcome_txt}\n\n"
-            f"🆔 معرّفك الخاص: `{user_id}`\n"
-            f"💰 رصيدك الحالي: **${balance:.2f}**\n"
-            f"🎁 أرباح الإحالة: **${ref_balances.get(user_id, 0.0):.2f}**"
-        )
-        keyboard = [
-            [InlineKeyboardButton("💎 الشراء الآن", callback_data="store")],
-            [InlineKeyboardButton("📜 طلباتي", callback_data="my_orders"), InlineKeyboardButton("👑 الحساب الشخصي", callback_data="profile")],
-            [InlineKeyboardButton("💳 إيداع رصيد", callback_data="deposit"), InlineKeyboardButton("🤝 نظام الإحالة", callback_data="referral")],
-            [InlineKeyboardButton("🎁 استخدام كود شحن", callback_data="use_code")],
-            [InlineKeyboardButton("📖 طريقة الاستخدام", callback_data="how_to"), InlineKeyboardButton("💬 الدعم الفني", callback_data="support")],
-            [InlineKeyboardButton("🇸🇦 العربية", callback_data="lang_ar"), InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")]
-        ]
-        
+    text = (
+        f"🤖 **─── متجر قيس للخدمات ───** {is_seller}\n\n"
+        f"{welcome_txt}\n\n"
+        f"🆔 معرّفك الخاص: `{user_id}`\n"
+        f"💰 رصيدك الحالي: **${balance:.2f}**\n"
+        f"🎁 أرباح الإحالة: **${ref_balances.get(user_id, 0.0):.2f}**"
+    )
+    keyboard = [
+        [InlineKeyboardButton("💎 الشراء الآن", callback_data="store")],
+        [InlineKeyboardButton("📜 طلباتي", callback_data="my_orders"), InlineKeyboardButton("👑 الحساب الشخصي", callback_data="profile")],
+        [InlineKeyboardButton("💳 إيداع رصيد", callback_data="deposit"), InlineKeyboardButton("🤝 نظام الإحالة", callback_data="referral")],
+        [InlineKeyboardButton("🎁 استخدام كود شحن", callback_data="use_code")],
+        [InlineKeyboardButton("📖 طريقة الاستخدام", callback_data="how_to"), InlineKeyboardButton("💬 الدعم الفني", callback_data="support")]
+    ]
     return text, InlineKeyboardMarkup(keyboard)
 
-# --- 5. بداية المحادثة والتحقق من الاشتراك ---
+# --- 4. بداية المحادثة ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
     
-    if user_id in banned_users:
-        return
+    if user_id in banned_users: return
 
     all_users.add(user_id)
     user_balances.setdefault(user_id, 0.0)
@@ -165,396 +152,257 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             referrer_id = int(context.args[0])
             if referrer_id != user_id and referrer_id in all_users:
                 user_referrals[user_id] = referrer_id
-                await context.bot.send_message(
-                    referrer_id, 
-                    f"🎉 **انضم مستخدم جديد عبر رابط إحالتك!**\n🆔 المستخدم: `{user_id}`\nستحصل على 10% من كافة مشترياته المستقبليّة.",
-                    parse_mode="Markdown"
-                )
-        except Exception:
-            pass
+        except Exception: pass
 
     if not await check_subscription(user_id, context):
         keyboard = [
             [InlineKeyboardButton("📢 انضم للقناة الآن", url=f"https://t.me/{REQUIRED_CHANNEL}")],
             [InlineKeyboardButton("🔄 تحقق من الاشتراك", callback_data="check_sub")]
         ]
-        await update.message.reply_text(
-            "⚠️ **عذراً يا الغالي! لازم تشترك بقناة المتجر أولاً عشان تقدر تستخدم البوت:**\n\nاضغط على الزر بالأسفل وبعد الانضمام اضغط تحقق:",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await update.message.reply_text("⚠️ **اشترك بالقناة أولاً للاستخدام:**", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    if user_id not in user_data or "lang" not in user_data[user_id]:
-        keyboard = [[
-            InlineKeyboardButton("🇸🇦 العربية", callback_data="init_lang_ar"),
-            InlineKeyboardButton("🇬🇧 English", callback_data="init_lang_en")
-        ]]
-        await update.message.reply_text(
-            "👋 **مرحباً بك! اختر اللّغة للبدء / Welcome! Select language:**",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-        return
-
-    lang = user_data[user_id].get("lang", "ar")
+    lang = user_data.get(user_id, {}).get("lang", "ar")
     text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
-# --- 6. لوحة تحكّم الأدمن الشاملة الخاصة بقيس فقط ---
+# --- 5. لوحة التحكم المتطورة للأدمن (مع أزرار تفاعلية) ---
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        return  # حماية مطلقة
+    if update.effective_user.id != ADMIN_CHAT_ID: return
 
+    keyboard = [
+        [InlineKeyboardButton("➕ إضافة منتج جديد", callback_data="admin_add_prod")],
+        [InlineKeyboardButton("⚙️ إدارة المنتجات والأسعار", callback_data="admin_manage_prods")],
+        [InlineKeyboardButton("💰 شحن رصيد لمستخدم", callback_data="admin_add_bal")],
+        [InlineKeyboardButton("👑 ترقية بائع", callback_data="admin_set_seller"), InlineKeyboardButton("⛔ حظر مستخدم", callback_data="admin_ban")],
+        [InlineKeyboardButton("🎁 إنشاء كود شحن", callback_data="admin_make_code")],
+        [InlineKeyboardButton("📢 إذاعة عامة", callback_data="admin_broadcast")]
+    ]
+    
     msg = (
-        "👑 **── لوحة تحكم الآدمن الشاملة (قيس) ──**\n\n"
+        "👑 **── لوحة تحكم الآدمن المتطورة (قيس) ──**\n\n"
         f"👥 المستخدمين: **{len(all_users)}** | ⛔ المحظورين: **{len(banned_users)}**\n"
-        f"🏷️ البائعين المعتمدين: **{len(sellers_list)}**\n"
-        f"📢 القناة الإجبارية: **@{REQUIRED_CHANNEL}**\n\n"
-        "🛠️ **جميع الأوامر المتاحة لك:**\n"
-        "• `/addproduct [رمز] [الاسم_بدون_مسافات] [سعر_عادي] [سعر_بائع]` - إضافة/تحديث منتج\n"
-        "• `/delproduct [رمز]` - حذف منتج من المتجر\n"
-        "• `/addbalance [User_ID] [المبلغ]` - شحن رصيد لمستخدم\n"
-        "• `/setseller [User_ID]` - تحويل إلى حساب بائع\n"
-        "• `/delseller [User_ID]` - إزالة رتبة بائع\n"
-        "• `/ban [User_ID]` | `/unban [User_ID]` - حظر/فك حظر\n"
-        "• `/makecode [الرمز] [المبلغ]` - إنشاء كود شحن\n"
-        "• `/broadcast [الرسالة]` - إذاعة عامة لجميع المشتركين\n\n"
-        "📦 **المنتجات الحالية:**\n"
+        f"🏷️ البائعين: **{len(sellers_list)}** | 📦 المنتجات: **{len(products_db)}**\n\n"
+        "اختر من القائمة أدناه للتحكم الشامل بكل سهولة:"
     )
-    for code, item in products_db.items():
-        msg += f"• `{code}` | {item['name']} - عادي: **${item['price']}** | بائع: **${item.get('seller_price', item['price'])}**\n"
+    
+    if update.message:
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+    else:
+        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-    await update.message.reply_text(msg, parse_mode="Markdown")
-
-async def add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        code = context.args[0].upper()
-        name = context.args[1].replace("_", " ")
-        price = float(context.args[2])
-        seller_price = float(context.args[3]) if len(context.args) > 3 else price
-        products_db[code] = {"name": name, "price": price, "seller_price": seller_price}
-        await update.message.reply_text(f"🎉 تم إضافة/تحديث المنتج `{code}` ({name})\nعادي: **${price}** | بائع: **${seller_price}**", parse_mode="Markdown")
-    except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/addproduct FREEFIRE شدات_فري_فاير 5.0 4.0`", parse_mode="Markdown")
-
-async def del_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        code = context.args[0].upper()
-        if code in products_db:
-            del products_db[code]
-            await update.message.reply_text(f"🗑️ تم حذف المنتج `{code}` بنجاح!")
-        else:
-            await update.message.reply_text("❌ المنتج غير موجود!")
-    except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/delproduct APKMOD`", parse_mode="Markdown")
-
-async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        target_id = int(context.args[0])
-        amount = float(context.args[1])
-        user_balances[target_id] = user_balances.get(target_id, 0.0) + amount
-        await update.message.reply_text(f"💰 تم إضافة **${amount}** للمستخدم `{target_id}`!", parse_mode="Markdown")
-        await context.bot.send_message(target_id, f"🎉 **تم إضافة رصيد إلى حسابك!**\nالمبلغ المضاف: **${amount:.2f}**\nرصيدك الحالي: **${user_balances[target_id]:.2f}**", parse_mode="Markdown")
-    except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/addbalance 8556501768 10`", parse_mode="Markdown")
-
-async def set_seller(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        target_id = int(context.args[0])
-        sellers_list.add(target_id)
-        await update.message.reply_text(f"👑 تم منح رتبة **بائع** للمستخدم `{target_id}` بنجاح!", parse_mode="Markdown")
-        await context.bot.send_message(target_id, "🎉 **مبارك! تم ترقية حسابك إلى رتبة بائع.**\nستحصل الآن على أسعار الموزعين المنخفضة داخل المتجر تلقائياً!")
-    except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/setseller 12345678`", parse_mode="Markdown")
-
-async def del_seller(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        target_id = int(context.args[0])
-        sellers_list.discard(target_id)
-        await update.message.reply_text(f"تم سحب رتبة البائع من `{target_id}`.")
-    except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/delseller 12345678`", parse_mode="Markdown")
-
-async def ban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        target_id = int(context.args[0])
-        banned_users.add(target_id)
-        await update.message.reply_text(f"⛔ تم حظر المستخدم `{target_id}`.")
-    except Exception:
-        await update.message.reply_text("⚠️ اكتب الـ ID بعد الأمر.")
-
-async def unban_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        target_id = int(context.args[0])
-        banned_users.discard(target_id)
-        await update.message.reply_text(f"✅ تم فك الحظر عن `{target_id}`.")
-    except Exception:
-        await update.message.reply_text("⚠️ اكتب الـ ID بعد الأمر.")
-
-async def make_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    try:
-        code = context.args[0]
-        amount = float(context.args[1])
-        gift_codes[code] = amount
-        await update.message.reply_text(f"🎁 تم إنشاء كود شحن: `{code}` بقيمة **${amount:.2f}**", parse_mode="Markdown")
-    except Exception:
-        await update.message.reply_text("⚠️ مثال: `/makecode QAIS10 10`", parse_mode="Markdown")
-
-async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_CHAT_ID: return
-    msg_text = " ".join(context.args)
-    if not msg_text: return
-    count = 0
-    for uid in all_users:
-        try:
-            await context.bot.send_message(uid, f"📢 **تنويه إداري:**\n\n{msg_text}", parse_mode="Markdown")
-            count += 1
-        except Exception: pass
-    await update.message.reply_text(f"✅ تم إرسال الإذاعة إلى **{count}** مستخدم!")
-
-# --- 7. معالجة الأزرار والتفاعلات ---
+# --- 6. معالج الأزرار التفاعلية ---
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    user = query.from_user
-    user_id = user.id
+    user_id = query.from_user.id
 
     if user_id in banned_users: return
 
     user_balances.setdefault(user_id, 0.0)
     ref_balances.setdefault(user_id, 0.0)
     user_data.setdefault(user_id, {})
-
-    if query.data == "check_sub":
-        if await check_subscription(user_id, context):
-            await query.edit_message_text("✅ **تم التحقق بنجاح! مرحباً بك بمتجر قيس.**\nأرسل /start لفتح القائمة.")
-        else:
-            await query.answer("❌ لم تنضم للقناة بعد! يرجى الانضمام أولاً.", show_alert=True)
-        return
-
-    if query.data.startswith("init_lang_"):
-        lang = query.data.split("_")[2]
-        user_data[user_id]["lang"] = lang
-        text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
-        return
-
     lang = user_data[user_id].get("lang", "ar")
 
-    if query.data.startswith("lang_"):
-        lang = query.data.split("_")[1]
-        user_data[user_id]["lang"] = lang
-        text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
-        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
+    # --- أزرار الأدمن المتطورة ---
+    if query.data == "admin_panel":
+        await admin_panel(update, context)
+        return
 
+    elif query.data == "admin_add_prod":
+        user_data[user_id]["state"] = "ADMIN_ADD_PROD_CODE"
+        await query.edit_message_text("📝 **أدخل كود المنتج الجديد (مثال: FREEFIRE أو DRIP):**")
+        return
+
+    elif query.data == "admin_manage_prods":
+        keyboard = []
+        for code, item in products_db.items():
+            keyboard.append([InlineKeyboardButton(f"📦 {item['name']} ({code})", callback_data=f"admin_view_prod_{code}")])
+        keyboard.append([InlineKeyboardButton("🔙 العودة للوحة الأدمن", callback_data="admin_panel")])
+        await query.edit_message_text("⚙️ **اختر المنتج لتعديله أو إضافة خيارات مدة/أسعار جديدة:**", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    elif query.data.startswith("admin_view_prod_"):
+        code = query.data.split("_")[3]
+        prod = products_db.get(code)
+        if not prod: return
+        
+        msg = f"📦 **المنتج:** {prod['name']} (`{code}`)\n\n**الخيارات الحالية:**\n"
+        keyboard = []
+        for opt_key, opt_data in prod.get("options", {}).items():
+            msg += f"• `{opt_key}`: {opt_data['label']} - عادي: ${opt_data['price']} | بائع: ${opt_data['seller_price']}\n"
+            keyboard.append([InlineKeyboardButton(f"❌ حذف خيار {opt_key}", callback_data=f"admin_del_opt_{code}_{opt_key}")])
+        
+        keyboard.append([InlineKeyboardButton("➕ إضافة مدة/خيار سعر جديد", callback_data=f"admin_add_opt_{code}")])
+        keyboard.append([InlineKeyboardButton("🗑️ حذف المنتج بالكامل", callback_data=f"admin_del_prod_{code}")])
+        keyboard.append([InlineKeyboardButton("🔙 العودة للمنتجات", callback_data="admin_manage_prods")])
+        
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    elif query.data.startswith("admin_add_opt_"):
+        code = query.data.split("_")[3]
+        user_data[user_id]["selected_prod"] = code
+        user_data[user_id]["state"] = "ADMIN_ADD_OPT_KEY"
+        await query.edit_message_text(f"➕ **إضافة خيار مدة لـ `{code}`**\n\nأرسل رمز الخيار (مثال: `1d` أو `7d` أو `30d`):", parse_mode="Markdown")
+        return
+
+    elif query.data.startswith("admin_del_opt_"):
+        _, _, _, code, opt_key = query.data.split("_")
+        if code in products_db and opt_key in products_db[code]["options"]:
+            del products_db[code]["options"][opt_key]
+            await query.answer("✅ تم حذف الخيار!")
+            await button_handler(update, context) # إعادة تحميل
+        return
+
+    elif query.data.startswith("admin_del_prod_"):
+        code = query.data.split("_")[3]
+        if code in products_db:
+            del products_db[code]
+            await query.answer("🗑️ تم حذف المنتج بالكامل!")
+        await admin_panel(update, context)
+        return
+
+    # --- متجر العميل وتصفح الخيارات ---
     elif query.data == "store":
         keyboard = []
-        is_seller = user_id in sellers_list
         for code, item in products_db.items():
-            price = item['seller_price'] if is_seller else item['price']
-            tag = " 🏷️ (سعر بائع)" if is_seller else ""
-            btn_text = f"📱 {item['name']} - ${price:.2f}{tag}"
-            keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"prod_{code}")])
+            keyboard.append([InlineKeyboardButton(f"📱 {item['name']}", callback_data=f"view_prod_{code}")])
         keyboard.append([InlineKeyboardButton("🔙 العودة للقائمة", callback_data="main_menu")])
-        
-        txt = "🛍️ **اختر الخدمة المطلوبة:**"
-        if is_seller: txt += "\n✨ (تم تطبيق أسعار الموزعين والبائعين المنخفضة)"
-        await query.edit_message_text(txt, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.edit_message_text("🛍️ **اختر الخدمة أو التطبيق المطلوب:**", parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
-    elif query.data.startswith("prod_"):
-        code = query.data.split("_")[1]
+    elif query.data.startswith("view_prod_"):
+        code = query.data.split("_")[2]
         item = products_db.get(code)
-        if not item:
-            await query.edit_message_text("❌ هذا المنتج غير متوفر حالياً.")
+        if not item or not item.get("options"):
+            await query.edit_message_text("❌ لا توجد خيارات متاحة لهذا المنتج حالياً.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة", callback_data="store")]]))
             return
 
         is_seller = user_id in sellers_list
-        price = item['seller_price'] if is_seller else item['price']
-        current_balance = user_balances[user_id]
+        keyboard = []
+        for opt_key, opt_val in item["options"].items():
+            price = opt_val['seller_price'] if is_seller else opt_val['price']
+            tag = " 👑" if is_seller else ""
+            btn_txt = f"⏱️ {opt_val['label']} - ${price:.2f}{tag}"
+            keyboard.append([InlineKeyboardButton(btn_txt, callback_data=f"buy_{code}_{opt_key}")])
 
-        if current_balance < price:
+        keyboard.append([InlineKeyboardButton("🔙 العودة للمتجر", callback_data="store")])
+        txt = f"🛍️ **خدمة {item['name']}**\nاختر المدة أو الخيار المناسب لك:"
+        await query.edit_message_text(txt, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+    elif query.data.startswith("buy_"):
+        _, code, opt_key = query.data.split("_")
+        item = products_db.get(code, {})
+        opt = item.get("options", {}).get(opt_key)
+
+        if not opt: return
+        is_seller = user_id in sellers_list
+        price = opt['seller_price'] if is_seller else opt['price']
+
+        if user_balances[user_id] < price:
             await query.edit_message_text(
-                f"❌ رصيدك غير كافٍ!\nرصيدك الحالي: **${current_balance:.2f}**\nسعر الخدمة: **${price:.2f}**",
+                f"❌ رصيدك غير كافٍ!\nالمطلوب: **${price:.2f}** | رصيدك: **${user_balances[user_id]:.2f}**",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("💳 إيداع رصيد الآن", callback_data="deposit")]])
             )
         else:
-            user_data[user_id]["buying_product"] = code
+            user_data[user_id]["buy_code"] = code
+            user_data[user_id]["buy_opt"] = opt_key
             user_data[user_id]["state"] = "WAITING_EMAIL"
-            await query.edit_message_text(f"🛒 اخترت: **{item['name']}** بسعر **${price:.2f}**\n\n📧 أرسل بريدك الإلكتروني الآن لتسليم الطلب:")
+            await query.edit_message_text(f"🛒 اخترت: **{item['name']} ({opt['label']})**\n💰 السعر: **${price:.2f}**\n\n📧 أرسل البريد الإلكتروني لتسلم الطلب:")
 
     elif query.data == "deposit":
         user_data[user_id]["state"] = "WAITING_TXID"
-        msg = (
-            "💳 **── قسم إيداع الرصيد ──**\n\n"
-            f"• **Binance Pay ID:** `{BINANCE_PAY_ID}`\n"
-            f"• **USDT (BEP20):** `{USDT_WALLET}`\n\n"
-            "أرسل **رمز الحوالة (TxID)** هنا للتحقق التلقائي:"
-        )
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للقائمة", callback_data="main_menu")]]))
-
-    elif query.data == "referral":
-        bot_info = await context.bot.get_me()
-        ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
-        msg = (
-            "🤝 **── نظام الإحالة والأرباح (10%) ──**\n\n"
-            f"🔗 رابط الإحالة الخاص بك:\n`{ref_link}`\n\n"
-            "💡 شارك الرابط مع أصدقائك، وستحصل على **10% تلقائياً** من أي عملية شراء يقومون بها داخل البوت!\n\n"
-            f"💰 أرباح الإحالة الحالية: **${ref_balances[user_id]:.2f}**"
-        )
-        keyboard = [
-            [InlineKeyboardButton("🔄 تحويل الأرباح للمحفظة الرئيسية", callback_data="claim_ref")],
-            [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="main_menu")]
-        ]
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif query.data == "claim_ref":
-        amount = ref_balances[user_id]
-        if amount <= 0:
-            await query.answer("❌ لا يوجد لديك أرباح إحالة لتحويلها حالياً!", show_alert=True)
-        else:
-            ref_balances[user_id] = 0.0
-            user_balances[user_id] += amount
-            await query.answer(f"🎉 تم تحويل ${amount:.2f} إلى رصيدك الرئيسي بنجاح!", show_alert=True)
-            text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
-            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
-
-    elif query.data == "use_code":
-        user_data[user_id]["state"] = "WAITING_CODE"
-        await query.edit_message_text("🎁 **أدخل كود الشحن / الهدية الآن:**", parse_mode="Markdown")
-
-    elif query.data == "profile":
-        is_seller_txt = "نعم 👑" if user_id in sellers_list else "لا"
-        msg = (
-            "👑 **── الحساب الشخصي ──**\n\n"
-            f"👤 المستخدم: @{user.username or 'غير معرف'}\n"
-            f"🆔 ID الخاص بك: `{user_id}`\n"
-            f"🏷️ حساب بائع: **{is_seller_txt}**\n"
-            f"💰 الرصيد الرئيسي: **${user_balances[user_id]:.2f}**\n"
-            f"🎁 أرباح الإحالات: **${ref_balances[user_id]:.2f}**"
-        )
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للقائمة", callback_data="main_menu")]]))
-
-    elif query.data == "my_orders":
-        orders = user_orders.get(user_id, [])
-        if not orders:
-            msg = "📜 لا يوجد لديك طلبات سابقة."
-        else:
-            msg = "📜 **سجل طلباتك الأخيرة:**\n\n" + "\n".join(orders)
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للقائمة", callback_data="main_menu")]]))
-
-    elif query.data in ["how_to", "support"]:
-        msg = bot_texts["how_to"] if query.data == "how_to" else bot_texts["support"]
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للقائمة", callback_data="main_menu")]]))
+        msg = f"💳 **قسم الشحن الآلي:**\n\n• **Binance Pay ID:** `{BINANCE_PAY_ID}`\n• **USDT (BEP20):** `{USDT_WALLET}`\n\nأرسل رمز الحوالة (TxID) هنا:"
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة", callback_data="main_menu")]]))
 
     elif query.data == "main_menu":
         user_data[user_id]["state"] = None
         text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
-# --- 8. معالجة الرسائل والإيميلات والتحقق ---
+# --- 7. معالجة إدخالات النصوص والمراحل ---
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    user_id = user.id
+    user_id = update.effective_user.id
     if user_id in banned_users: return
 
     text = update.message.text.strip()
     state = user_data.get(user_id, {}).get("state")
 
-    if state == "WAITING_TXID":
-        txid = text
-        if txid in used_txids:
-            await update.message.reply_text("⚠️ رمز الحوالة (TxID) مستخدم سابقاً!")
-            return
+    # إضافة منتج جديد - خطوة 1
+    if state == "ADMIN_ADD_PROD_CODE":
+        code = text.upper()
+        user_data[user_id]["temp_code"] = code
+        user_data[user_id]["state"] = "ADMIN_ADD_PROD_NAME"
+        await update.message.reply_text(f"أدخل اسم المنتج بالكامل لـ `{code}`:")
+        return
 
-        await update.message.reply_text("⏳ جاري الفحص والتحقق التلقائي مع بايننس...")
-        amount = check_binance_deposit(txid)
+    # إضافة منتج جديد - خطوة 2
+    elif state == "ADMIN_ADD_PROD_NAME":
+        code = user_data[user_id]["temp_code"]
+        products_db[code] = {"name": text, "options": {}}
+        user_data[user_id]["state"] = None
+        await update.message.reply_text(f"🎉 تم إنشاء المنتج `{code}` بنجاح! يمكنك الآن إضافة خيارات مدة وأسعار من لوحة التحكم.", parse_mode="Markdown")
+        return
 
-        if amount is not None:
-            if is_valid_amount(amount):
-                used_txids.add(txid)
-                user_balances[user_id] += amount
-                user_data[user_id]["state"] = None
+    # إضافة مدة وخيار للمنتج
+    elif state == "ADMIN_ADD_OPT_KEY":
+        user_data[user_id]["temp_opt_key"] = text
+        user_data[user_id]["state"] = "ADMIN_ADD_OPT_LABEL"
+        await update.message.reply_text("أدخل نص الخيار والمدة (مثال: `30 يوم (شهر)`):")
+        return
 
-                await update.message.reply_text(f"🎉 **تم شحن الرصيد بنجاح!**\nتم إضافة: **${amount:.2f}**\nرصيدك الجديد: **${user_balances[user_id]:.2f}**", parse_mode="Markdown")
+    elif state == "ADMIN_ADD_OPT_LABEL":
+        user_data[user_id]["temp_opt_label"] = text
+        user_data[user_id]["state"] = "ADMIN_ADD_OPT_PRICES"
+        await update.message.reply_text("أدخل السعر العادي ثم سعر البائع يفصل بينهما مسافة (مثال: `10 8`):")
+        return
 
-                admin_msg = f"✅ **إيداع آلي جديد!**\n👤 العميل: @{user.username or user_id}\n🆔 العميل: `{user_id}`\n💳 المبلغ: ${amount}\n🔗 TxID: `{txid}`"
-                await context.bot.send_message(ADMIN_CHAT_ID, admin_msg, parse_mode="Markdown")
-            else:
-                await update.message.reply_text("❌ المبلغ المحول غير مسموح به! يجب أن يكون إما 1$ أو من مضاعفات الـ 5.")
-        else:
-            await update.message.reply_text("❌ لم نتمكن من التأكد من العملية في بايننس. يرجى التأكد وإعادة المحاولة.")
+    elif state == "ADMIN_ADD_OPT_PRICES":
+        try:
+            p_norm, p_sell = map(float, text.split())
+            code = user_data[user_id]["selected_prod"]
+            opt_key = user_data[user_id]["temp_opt_key"]
+            label = user_data[user_id]["temp_opt_label"]
 
+            products_db[code]["options"][opt_key] = {
+                "label": label, "price": p_norm, "seller_price": p_sell
+            }
+            user_data[user_id]["state"] = None
+            await update.message.reply_text("✅ تم إضافة خيار السعر والمدة بنجاح!")
+        except Exception:
+            await update.message.reply_text("⚠️ خطأ في كتابة الأسعار! اكتب رقمين بينهما مسافة (مثال: 10 8).")
+        return
+
+    # الشراء واستلام الايميل
     elif state == "WAITING_EMAIL":
         if "@" in text and "." in text:
-            email = text
-            code = user_data[user_id].get("buying_product")
+            code = user_data[user_id].get("buy_code")
+            opt_key = user_data[user_id].get("buy_opt")
             item = products_db.get(code, {})
+            opt = item.get("options", {}).get(opt_key, {})
+
             is_seller = user_id in sellers_list
-            price = item.get("seller_price", item.get("price", 0)) if is_seller else item.get("price", 0)
+            price = opt.get("seller_price", opt.get("price", 0)) if is_seller else opt.get("price", 0)
 
             user_balances[user_id] -= price
             user_data[user_id]["state"] = None
 
-            order_info = f"• {item.get('name')} | ${price:.2f} | الإيميل: `{email}`"
+            order_info = f"• {item.get('name')} ({opt.get('label')}) | ${price:.2f} | الإيميل: `{text}`"
             user_orders.setdefault(user_id, []).append(order_info)
 
-            if user_id in user_referrals:
-                ref_id = user_referrals[user_id]
-                commission = price * 0.10
-                ref_balances[ref_id] = ref_balances.get(ref_id, 0.0) + commission
-                try:
-                    await context.bot.send_message(ref_id, f"🎉 **أرباح إحالة جديدة!**\nحصلت على **${commission:.2f}** (10%) بمحفظة الإحالة.")
-                except Exception: pass
-
-            await update.message.reply_text(f"✅ تم خصم **${price:.2f}** من رصيدك بنجاح.\nالخدمة: {item.get('name')}\nالإيميل: `{email}`\nسيتم التسليم فوراً!")
-
-            admin_msg = f"📦 **طلب جديد!**\n👤 العميل: @{user.username or user_id}\n🆔 العميل: `{user_id}`\n🛒 الخدمة: {item.get('name')}\n📧 الإيميل للنسخ: `{email}`"
-            await context.bot.send_message(ADMIN_CHAT_ID, admin_msg, parse_mode="Markdown")
+            await update.message.reply_text(f"✅ **تم تنفيذ الطلب بنجاح!**\nالخدمة: {item.get('name')} - {opt.get('label')}\nالإيميل: `{text}`", parse_mode="Markdown")
+            await context.bot.send_message(ADMIN_CHAT_ID, f"📦 **طلب جديد!**\n👤 العميل: `{user_id}`\n🛒 الخدمة: {item.get('name')} ({opt.get('label')})\n📧 الإيميل: `{text}`", parse_mode="Markdown")
         else:
             await update.message.reply_text("⚠️ البريد الإلكتروني غير صحيح!")
 
-    elif state == "WAITING_CODE":
-        code_input = text.strip()
-        if code_input in gift_codes:
-            amount = gift_codes.pop(code_input)
-            user_balances[user_id] += amount
-            user_data[user_id]["state"] = None
-            await update.message.reply_text(f"🎉 **مبروك! تم تفعيل الكود بنجاح.**\nتم إضافة **${amount:.2f}** لحسابك!", parse_mode="Markdown")
-        else:
-            await update.message.reply_text("❌ الكود خاطئ أو تم استخدامه سابقاً!")
-
-# --- 9. التشغيل الرئيسي ---
+# --- 8. التشغيل ---
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # الأوامر الرئيسية
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
-
-    # أوامر الأدمن الكاملة (لك فقط)
-    app.add_handler(CommandHandler("addproduct", add_product))
-    app.add_handler(CommandHandler("delproduct", del_product))
-    app.add_handler(CommandHandler("addbalance", add_balance_cmd))
-    app.add_handler(CommandHandler("setseller", set_seller))
-    app.add_handler(CommandHandler("delseller", del_seller))
-    app.add_handler(CommandHandler("ban", ban_user))
-    app.add_handler(CommandHandler("unban", unban_user))
-    app.add_handler(CommandHandler("makecode", make_code))
-    app.add_handler(CommandHandler("broadcast", broadcast))
-
-    # التفاعلات والرسائل
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
-
-    print("Bot is fully updated, tested and running...")
+    
+    print("Bot is fully live and updated...")
     app.run_polling()

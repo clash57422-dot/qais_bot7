@@ -30,7 +30,7 @@ def run_dummy_server():
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
 # --- 2. الإعدادات والبيانات الأساسية ---
-BOT_TOKEN = "8466390738:AAFLuzHub_ijth8G8DeKzV3moQ4afafIiZo"
+BOT_TOKEN = "8466390738:AAHMVZhjGaUuYZq0J-4RBFKZvJp9aVF-9R0"
 ADMIN_CHAT_ID = 8556501768  # ID قيس فقط
 
 REQUIRED_CHANNEL = "qais_storeee"

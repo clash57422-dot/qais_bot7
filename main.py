@@ -13,7 +13,7 @@ from telegram.ext import (
 )
 
 # 1. Configurations & Constants
-BOT_TOKEN = "8466390738:AAHMVzhGalyuZQqU4AR8FKZvJp9navF-9R0"
+BOT_TOKEN = "8466390738:AAF_N1sYQp8fUZY0X6gnwUP8ixf7Rw2sO2g"
 BINANCE_PAY_ID = "100528970"
 USDT_BEP20_ADDRESS = "0x409293a253f6627366f7014ee3c2d5a9dac2a"
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "855650178"))

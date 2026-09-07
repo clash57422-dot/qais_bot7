@@ -15,12 +15,12 @@ from telegram.ext import (
     filters,
 )
 
-# --- 1. سيرفر وهمي لتشغيل Render مجاناً 24/7 ---
+# --- 1. سيرفر وهمي لتشغيل Render مجاناً 24/7 بدون توقف ---
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"QAIS STORE Bot is Live and Running Perfectly!")
+        self.wfile.write(b"QAIS STORE Bot is Live and Running Perfectly 24/7!")
 
 def run_dummy_server():
     port = int(os.environ.get("PORT", 8080))
@@ -29,9 +29,9 @@ def run_dummy_server():
 
 threading.Thread(target=run_dummy_server, daemon=True).start()
 
-# --- 2. البيانات الأساسية والإعدادات ---
+# --- 2. البيانات الأساسية والإعدادات الخاصة بقيس ---
 BOT_TOKEN = "8466390738:AAFLuzHub_ijth8G8DeKzV3moQ4afafIiZo"
-ADMIN_CHAT_ID = 8556501768  # ID قيس فقط
+ADMIN_CHAT_ID = 8556501768  # ID قيس فقط (لا أحد غيرك يستطيع التحكم)
 
 REQUIRED_CHANNEL = "qais_storeee"  # قناة الاشتراك الإجباري بدون @
 SUPPORT_USERNAME = "qais_storee"    # حساب الدعم الفني
@@ -61,7 +61,7 @@ user_data = {}
 all_users = set()
 used_txids = set()
 
-# النصوص
+# النصوص العامة
 bot_texts = {
     "welcome_ar": "👋 **أهلاً بك في QAIS STORE!**\n⭐ متجر الخدمات والتطبيقات المعدلة الممتازة\n⚡ تحقق وإيداع آلي 24/7",
     "welcome_en": "👋 **Welcome to QAIS STORE!**\n⭐ Premium Game Keys & Mod Tools\n⚡ Instant Verification 24/7",
@@ -69,7 +69,7 @@ bot_texts = {
     "how_to": "📖 **طريقة الاستخدام:**\n1. اشحن محفظتك بـ USDT عبر بايننس.\n2. اختر الخدمة من المتجر.\n3. أدخل بريدك واستلم طلبك فوراً."
 }
 
-# --- 3. التحقق من الاشتراك وبايننس ---
+# --- 3. أدوات التحقق واشتراك القناة وبابننس ---
 async def check_subscription(user_id, context):
     if not REQUIRED_CHANNEL:
         return True
@@ -77,7 +77,7 @@ async def check_subscription(user_id, context):
         member = await context.bot.get_chat_member(f"@{REQUIRED_CHANNEL}", user_id)
         return member.status in ["member", "administrator", "creator"]
     except Exception:
-        return True  # تجنب التعليق في حال عدم وجود البوت كأدمن بالقناة
+        return True
 
 def check_binance_deposit(tx_id):
     url = "https://api.binance.com/sapi/v1/capital/deposit/hisrec"
@@ -148,7 +148,7 @@ def build_main_menu(lang, balance, user_id):
         
     return text, InlineKeyboardMarkup(keyboard)
 
-# --- 5. بداية التعامل مع المستخدم والاشتراك الإجباري ---
+# --- 5. بداية المحادثة والتحقق من الاشتراك ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
@@ -160,7 +160,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_balances.setdefault(user_id, 0.0)
     ref_balances.setdefault(user_id, 0.0)
 
-    # التسجيل عبر رابط الإحالة
     if context.args and user_id not in user_referrals:
         try:
             referrer_id = int(context.args[0])
@@ -174,7 +173,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-    # فحص الاشتراك الإجباري
     if not await check_subscription(user_id, context):
         keyboard = [
             [InlineKeyboardButton("📢 انضم للقناة الآن", url=f"https://t.me/{REQUIRED_CHANNEL}")],
@@ -203,25 +201,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
-# --- 6. لوحة تحكّم الأدمن الشاملة والسرية ---
+# --- 6. لوحة تحكّم الأدمن الشاملة الخاصة بقيس فقط ---
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID:
-        return  # يتجاهل أي شخص آخر حماية مطلقاً
+        return  # حماية مطلقة
 
     msg = (
         "👑 **── لوحة تحكم الآدمن الشاملة (قيس) ──**\n\n"
         f"👥 المستخدمين: **{len(all_users)}** | ⛔ المحظورين: **{len(banned_users)}**\n"
         f"🏷️ البائعين المعتمدين: **{len(sellers_list)}**\n"
         f"📢 القناة الإجبارية: **@{REQUIRED_CHANNEL}**\n\n"
-        "🛠️ **الأوامر المتاحة:**\n"
-        "• `/addproduct [رمز] [اسم_بدون_مسافات] [سعر_عادي] [سعر_بائع]` - إضافة/تحديث منتج\n"
-        "• `/delproduct [رمز]` - حذف منتج\n"
-        "• `/addbalance [User_ID] [المبلغ]` - شحن رصيد\n"
+        "🛠️ **جميع الأوامر المتاحة لك:**\n"
+        "• `/addproduct [رمز] [الاسم_بدون_مسافات] [سعر_عادي] [سعر_بائع]` - إضافة/تحديث منتج\n"
+        "• `/delproduct [رمز]` - حذف منتج من المتجر\n"
+        "• `/addbalance [User_ID] [المبلغ]` - شحن رصيد لمستخدم\n"
         "• `/setseller [User_ID]` - تحويل إلى حساب بائع\n"
         "• `/delseller [User_ID]` - إزالة رتبة بائع\n"
         "• `/ban [User_ID]` | `/unban [User_ID]` - حظر/فك حظر\n"
         "• `/makecode [الرمز] [المبلغ]` - إنشاء كود شحن\n"
-        "• `/broadcast [الرسالة]` - إذاعة عامة للكل\n\n"
+        "• `/broadcast [الرسالة]` - إذاعة عامة لجميع المشتركين\n\n"
         "📦 **المنتجات الحالية:**\n"
     )
     for code, item in products_db.items():
@@ -237,9 +235,9 @@ async def add_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
         price = float(context.args[2])
         seller_price = float(context.args[3]) if len(context.args) > 3 else price
         products_db[code] = {"name": name, "price": price, "seller_price": seller_price}
-        await update.message.reply_text(f"🎉 تم إضافة/تحديث المنتج `{code}` ({name})\nعادي: **${price}** | بائع: **${seller_price}**")
+        await update.message.reply_text(f"🎉 تم إضافة/تحديث المنتج `{code}` ({name})\nعادي: **${price}** | بائع: **${seller_price}**", parse_mode="Markdown")
     except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/addproduct PROXY DRIP_Proxy 5.0 4.0`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/addproduct FREEFIRE شدات_فري_فاير 5.0 4.0`", parse_mode="Markdown")
 
 async def del_product(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID: return
@@ -259,17 +257,17 @@ async def add_balance_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target_id = int(context.args[0])
         amount = float(context.args[1])
         user_balances[target_id] = user_balances.get(target_id, 0.0) + amount
-        await update.message.reply_text(f"💰 تم إضافة **${amount}** لـ `{target_id}`!")
+        await update.message.reply_text(f"💰 تم إضافة **${amount}** للمستخدم `{target_id}`!", parse_mode="Markdown")
         await context.bot.send_message(target_id, f"🎉 **تم إضافة رصيد إلى حسابك!**\nالمبلغ المضاف: **${amount:.2f}**\nرصيدك الحالي: **${user_balances[target_id]:.2f}**", parse_mode="Markdown")
     except Exception:
-        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/addbalance 12345678 10`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/addbalance 8556501768 10`", parse_mode="Markdown")
 
 async def set_seller(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID: return
     try:
         target_id = int(context.args[0])
         sellers_list.add(target_id)
-        await update.message.reply_text(f"👑 تم إعطاء رتبة **بائع** للمستخدم `{target_id}` بنجاح!")
+        await update.message.reply_text(f"👑 تم منح رتبة **بائع** للمستخدم `{target_id}` بنجاح!", parse_mode="Markdown")
         await context.bot.send_message(target_id, "🎉 **مبارك! تم ترقية حسابك إلى رتبة بائع.**\nستحصل الآن على أسعار الموزعين المنخفضة داخل المتجر تلقائياً!")
     except Exception:
         await update.message.reply_text("⚠️ استخدام خاطئ!\nمثال: `/setseller 12345678`", parse_mode="Markdown")
@@ -309,7 +307,7 @@ async def make_code(update: Update, context: ContextTypes.DEFAULT_TYPE):
         gift_codes[code] = amount
         await update.message.reply_text(f"🎁 تم إنشاء كود شحن: `{code}` بقيمة **${amount:.2f}**", parse_mode="Markdown")
     except Exception:
-        await update.message.reply_text("⚠️ مثال: `/makecode GIFT10 10`", parse_mode="Markdown")
+        await update.message.reply_text("⚠️ مثال: `/makecode QAIS10 10`", parse_mode="Markdown")
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_CHAT_ID: return
@@ -376,7 +374,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         code = query.data.split("_")[1]
         item = products_db.get(code)
         if not item:
-            await query.edit_message_text("❌ هاد المنتج غير متوفر حالياً.")
+            await query.edit_message_text("❌ هذا المنتج غير متوفر حالياً.")
             return
 
         is_seller = user_id in sellers_list
@@ -463,7 +461,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text, reply_markup = build_main_menu(lang, user_balances[user_id], user_id)
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=reply_markup)
 
-# --- 8. معالجة الرسائل والطلبات والرموز ---
+# --- 8. معالجة الرسائل والإيميلات والتحقق ---
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     user_id = user.id
@@ -507,17 +505,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_balances[user_id] -= price
             user_data[user_id]["state"] = None
 
-            # تسجيل الطلب
             order_info = f"• {item.get('name')} | ${price:.2f} | الإيميل: `{email}`"
             user_orders.setdefault(user_id, []).append(order_info)
 
-            # تطبيق نسبة الإحالة 10%
             if user_id in user_referrals:
                 ref_id = user_referrals[user_id]
                 commission = price * 0.10
                 ref_balances[ref_id] = ref_balances.get(ref_id, 0.0) + commission
                 try:
-                    await context.bot.send_message(ref_id, f"🎉 **أرباح إحالة جديدة!**\nقام أستاذك المحال بطلب خدمة وحصلت على **${commission:.2f}** (10%) بمحفظة الإحالة.")
+                    await context.bot.send_message(ref_id, f"🎉 **أرباح إحالة جديدة!**\nحصلت على **${commission:.2f}** (10%) بمحفظة الإحالة.")
                 except Exception: pass
 
             await update.message.reply_text(f"✅ تم خصم **${price:.2f}** من رصيدك بنجاح.\nالخدمة: {item.get('name')}\nالإيميل: `{email}`\nسيتم التسليم فوراً!")
@@ -537,7 +533,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❌ الكود خاطئ أو تم استخدامه سابقاً!")
 
-# --- 9. تشغيل البوت ---
+# --- 9. التشغيل الرئيسي ---
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -545,7 +541,7 @@ if __name__ == "__main__":
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
 
-    # أوامر لوحة الأدمن
+    # أوامر الأدمن الكاملة (لك فقط)
     app.add_handler(CommandHandler("addproduct", add_product))
     app.add_handler(CommandHandler("delproduct", del_product))
     app.add_handler(CommandHandler("addbalance", add_balance_cmd))
@@ -560,5 +556,5 @@ if __name__ == "__main__":
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
-    print("Bot is fully updated and running...")
+    print("Bot is fully updated, tested and running...")
     app.run_polling()

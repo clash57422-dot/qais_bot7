@@ -28,11 +28,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8466390738:AAF_N1sYQp8fUZY0X6gnwUP8ixf7Rw2sO2g")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "562900738"))
-SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "qies111")
-CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "@YourChannel")
-BINANCE_PAY_KEY = os.getenv("BINANCE_PAY_KEY", "YOUR_BINANCE_PAY_KEY")
-BINANCE_PAY_SECRET = os.getenv("BINANCE_PAY_SECRET", "YOUR_BINANCE_PAY_SECRET")
+ADMIN_ID = int(os.getenv("ADMIN_ID", "8556501768"))
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@qais_storee")
+CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "https://t.me/qais_storeee")
+BINANCE_PAY_KEY = os.getenv("BINANCE_PAY_KEY", "ZlE5htIUI0DIKD6IZgcO95THLlEsolsWiGiAHEwHIR15E7h51cZnXm8jquHtkgvt")
+BINANCE_PAY_SECRET = os.getenv("BINANCE_PAY_SECRET", "nV95yafCNM80hohP8gLj6Y7zBzyV5JDeHH1iFE9NSiYOsLdW6Y1OMB7tu6k5H7O2")
 PORT = int(os.getenv("PORT", 8080))
 
 DB_FILE = "qais_store.db"
